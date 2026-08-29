@@ -9,12 +9,17 @@ export const getWeather = async (
 ): Promise<void> => {
   try {
     const { lat, lon } = req.query;
-    if (!lat || !lon) {
-      res.status(400).json({ success: false, message: "Missing lat/lon" });
+    
+    // Check if they exist and are valid numbers
+    const latNum = Number(lat);
+    const lonNum = Number(lon);
+
+    if (!lat || !lon || isNaN(latNum) || isNaN(lonNum)) {
+      res.status(400).json({ success: false, message: "Invalid or missing lat/lon coordinates" });
       return;
     }
 
-    const weather = await weatherService.getWeather(Number(lat), Number(lon));
+    const weather = await weatherService.getWeather(latNum, lonNum);
     res.status(200).json({ success: true, weather });
   } catch (error: any) {
     if (error.message === "API_NOT_CONFIGURED") {

@@ -11,8 +11,18 @@ export class WeatherService {
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_direction_10m`;
 
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error("Open-Meteo returned error");
+      const res = await fetch(url, { 
+        signal: AbortSignal.timeout(5000),
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "AlertGrid/1.0 (https://alert-grid-six.vercel.app)"
+        }
+      });
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "could not read body");
+        console.error(`[WeatherService] Open-Meteo Error! HTTP ${res.status} | URL: ${url} | Lat: ${lat}, Lon: ${lon} | Body: ${errBody}`);
+        throw new Error(`Open-Meteo returned error: ${res.status}`);
+      }
 
       const data = await res.json();
 
