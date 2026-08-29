@@ -7,11 +7,15 @@ export function LiveWeather({ lat, lon }: { lat: number; lon: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Normalize to 3 decimal places to avoid unnecessary refetches on tiny GPS drifts
+  const normLat = lat ? Number(lat.toFixed(3)) : 0;
+  const normLon = lon ? Number(lon.toFixed(3)) : 0;
+
   useEffect(() => {
     const fetchWeather = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/external/weather?lat=${lat}&lon=${lon}`);
+        const res = await api.get(`/external/weather?lat=${normLat}&lon=${normLon}`);
         setWeather(res.data.weather);
         setError("");
       } catch (err: any) {
@@ -26,8 +30,8 @@ export function LiveWeather({ lat, lon }: { lat: number; lon: number }) {
         setLoading(false);
       }
     };
-    if (lat && lon) fetchWeather();
-  }, [lat, lon]);
+    if (normLat && normLon) fetchWeather();
+  }, [normLat, normLon]);
 
   if (loading) {
     return (

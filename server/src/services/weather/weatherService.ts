@@ -8,18 +8,23 @@ interface CacheEntry {
 export class WeatherService {
   private memoryCache = new Map<string, CacheEntry>();
   private openMeteoRateLimitUntil = 0;
+  private inFlightRequests = new Map<string, Promise<any>>();
 
   async getWeather(lat: number, lon: number) {
-    const cacheKey = `weather:om:${lat.toFixed(2)}:${lon.toFixed(2)}`;
+    // 1. Normalize coordinates to 3 decimal places (approx 111m precision)
+    const normLat = Number(lat.toFixed(3));
+    const normLon = Number(lon.toFixed(3));
+    const cacheKey = `weather:om:${normLat.toFixed(3)}:${normLon.toFixed(3)}`;
     const now = Date.now();
 
-    // 1. Try Redis cache first
+    console.log(`[WeatherService] Normalized coordinates: ${normLat},${normLon}`);
+
+    // 2. Try Redis cache first
     try {
       const cached = await redisService.get(cacheKey);
       if (cached) {
         console.log(`[WeatherService] Cache HIT (Redis) for ${cacheKey}`);
         const parsed = JSON.parse(cached);
-        // Sync to memory cache for fallback in case Redis drops later
         this.memoryCache.set(cacheKey, { data: parsed, expiresAt: now + 900 * 1000 });
         return parsed;
       }
@@ -27,18 +32,37 @@ export class WeatherService {
       console.warn(`[WeatherService] Redis get failed for ${cacheKey}`);
     }
 
-    // 2. Try Memory cache (as primary if Redis is unavailable, or as fallback)
+    // 3. Try Memory cache
     const memCached = this.memoryCache.get(cacheKey);
     if (memCached && memCached.expiresAt > now) {
       console.log(`[WeatherService] Cache HIT (Memory) for ${cacheKey}`);
       return memCached.data;
     }
 
+    // 4. Request Deduplication (In-flight coalescing)
+    if (this.inFlightRequests.has(cacheKey)) {
+      console.log(`[WeatherService] Deduplicating request. Waiting for in-flight Open-Meteo request for ${cacheKey}...`);
+      return this.inFlightRequests.get(cacheKey);
+    }
+
+    const fetchPromise = this._fetchWeatherWithFallback(normLat, normLon, cacheKey, memCached);
+    this.inFlightRequests.set(cacheKey, fetchPromise);
+
+    try {
+      const result = await fetchPromise;
+      return result;
+    } finally {
+      this.inFlightRequests.delete(cacheKey);
+    }
+  }
+
+  private async _fetchWeatherWithFallback(lat: number, lon: number, cacheKey: string, memCached?: CacheEntry) {
+    const now = Date.now();
     console.log(`[WeatherService] Cache MISS for ${cacheKey}. Fetching from Open-Meteo...`);
 
     // Check Cooldown Backoff
     if (now < this.openMeteoRateLimitUntil) {
-      console.warn(`[WeatherService] Open-Meteo currently in cooldown. Skipping fetch.`);
+      console.warn(`[WeatherService] Open-Meteo 429 - entering cooldown (or currently in cooldown). Skipping fetch.`);
       if (memCached) {
         console.log(`[WeatherService] Returning STALE memory cache fallback for ${cacheKey}`);
         return { ...memCached.data, isStale: true };
