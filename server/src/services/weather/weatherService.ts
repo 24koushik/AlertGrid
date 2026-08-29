@@ -7,6 +7,7 @@ interface CacheEntry {
 
 export class WeatherService {
   private memoryCache = new Map<string, CacheEntry>();
+  private openMeteoRateLimitUntil = 0;
 
   async getWeather(lat: number, lon: number) {
     const cacheKey = `weather:om:${lat.toFixed(2)}:${lon.toFixed(2)}`;
@@ -35,6 +36,16 @@ export class WeatherService {
 
     console.log(`[WeatherService] Cache MISS for ${cacheKey}. Fetching from Open-Meteo...`);
 
+    // Check Cooldown Backoff
+    if (now < this.openMeteoRateLimitUntil) {
+      console.warn(`[WeatherService] Open-Meteo currently in cooldown. Skipping fetch.`);
+      if (memCached) {
+        console.log(`[WeatherService] Returning STALE memory cache fallback for ${cacheKey}`);
+        return { ...memCached.data, isStale: true };
+      }
+      throw new Error("RATE_LIMIT_EXCEEDED");
+    }
+
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_direction_10m`;
 
@@ -52,11 +63,12 @@ export class WeatherService {
         
         // Handle 429 Rate Limit Explicitly
         if (res.status === 429) {
-          console.warn(`[WeatherService] Open-Meteo 429 Quota Exhausted!`);
+          console.warn(`[WeatherService] Open-Meteo 429 Quota Exhausted! Setting 60m cooldown.`);
+          this.openMeteoRateLimitUntil = now + 60 * 60 * 1000; // 1 hour cooldown
           // Return stale cache if available
           if (memCached) {
              console.log(`[WeatherService] Returning STALE memory cache fallback for ${cacheKey}`);
-             return memCached.data;
+             return { ...memCached.data, isStale: true };
           }
           throw new Error("RATE_LIMIT_EXCEEDED");
         }

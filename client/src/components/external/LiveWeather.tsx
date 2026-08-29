@@ -15,7 +15,9 @@ export function LiveWeather({ lat, lon }: { lat: number; lon: number }) {
         setWeather(res.data.weather);
         setError("");
       } catch (err: any) {
-        if (err.response?.status === 503) {
+        if (err.response?.data?.message) {
+          setError(err.response.data.message);
+        } else if (err.response?.status === 503) {
           setError("Live weather unavailable — API not configured.");
         } else {
           setError("Live weather temporarily unavailable.");
@@ -52,6 +54,11 @@ export function LiveWeather({ lat, lon }: { lat: number; lon: number }) {
       <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center">
         <Cloud className="w-4 h-4 mr-2" />
         Live Weather
+        {weather.isStale && (
+          <span className="ml-2 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+            Cached (API Limit)
+          </span>
+        )}
       </h3>
       <div className="flex items-end space-x-2 mb-4">
         <span className="text-4xl font-bold text-slate-900">
