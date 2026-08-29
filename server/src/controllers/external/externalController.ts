@@ -24,6 +24,8 @@ export const getWeather = async (
   } catch (error: any) {
     if (error.message === "API_NOT_CONFIGURED") {
       res.status(503).json({ success: false, message: "API_NOT_CONFIGURED" });
+    } else if (error.message === "RATE_LIMIT_EXCEEDED") {
+      res.status(503).json({ success: false, message: "Weather temporarily unavailable (API Quota Exhausted)" });
     } else {
       res
         .status(500)
