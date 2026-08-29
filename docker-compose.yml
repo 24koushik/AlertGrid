@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: resqnet-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: resqnet_user
+      POSTGRES_PASSWORD: resqnet_password
+      POSTGRES_DB: resqnet_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: resqnet-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  postgres_data:

@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 221 38% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 221 38% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 38% 15%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 221 38% 15%;
+    --muted: 215 16% 96%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 221 38% 15%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --safe: 142 76% 36%;
+    --safe-foreground: 0 0% 100%;
+    --border: 216 26% 90%;
+    --input: 216 26% 90%;
+    --ring: 243 75% 59%;
+    --radius: 0.5rem;
+
+    /* AlertGrid New Semantic Colors */
+    --ag-indigo: 243 75% 59%;
+    --ag-deep-indigo: 242 47% 34%;
+    --ag-teal: 175 78% 26%;
+    --ag-aqua: 189 94% 43%;
+    --ag-emerald: 142 76% 36%;
+    --ag-amber: 38 92% 50%;
+    --ag-coral: 25 95% 53%;
+    --ag-red: 0 72% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}

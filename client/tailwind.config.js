@@ -1,0 +1,78 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: ["class"],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          default: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          default: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          default: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          default: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          default: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          default: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          default: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        warning: {
+          default: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        safe: {
+          default: "hsl(var(--safe))",
+          foreground: "hsl(var(--safe-foreground))",
+        },
+        brand: {
+          indigo: "hsl(var(--ag-indigo))",
+          deep: "hsl(var(--ag-deep-indigo))",
+          teal: "hsl(var(--ag-teal))",
+          aqua: "hsl(var(--ag-aqua))",
+          emerald: "hsl(var(--ag-emerald))",
+          amber: "hsl(var(--ag-amber))",
+          coral: "hsl(var(--ag-coral))",
+          red: "hsl(var(--ag-red))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
