@@ -7,14 +7,18 @@ interface CacheEntry {
 
 export class WeatherService {
   private memoryCache = new Map<string, CacheEntry>();
-  private openMeteoRateLimitUntil = 0;
+  private openWeatherRateLimitUntil = 0;
   private inFlightRequests = new Map<string, Promise<any>>();
 
   async getWeather(lat: number, lon: number) {
+    if (!process.env.OPENWEATHER_API_KEY) {
+      throw new Error("API_NOT_CONFIGURED");
+    }
+
     // 1. Normalize coordinates to 3 decimal places (approx 111m precision)
     const normLat = Number(lat.toFixed(3));
     const normLon = Number(lon.toFixed(3));
-    const cacheKey = `weather:om:${normLat.toFixed(3)}:${normLon.toFixed(3)}`;
+    const cacheKey = `weather:ow:${normLat.toFixed(3)}:${normLon.toFixed(3)}`;
     const now = Date.now();
 
     console.log(`[WeatherService] Normalized coordinates: ${normLat},${normLon}`);
@@ -41,7 +45,7 @@ export class WeatherService {
 
     // 4. Request Deduplication (In-flight coalescing)
     if (this.inFlightRequests.has(cacheKey)) {
-      console.log(`[WeatherService] Deduplicating request. Waiting for in-flight Open-Meteo request for ${cacheKey}...`);
+      console.log(`[WeatherService] Deduplicating request. Waiting for in-flight OpenWeather request for ${cacheKey}...`);
       return this.inFlightRequests.get(cacheKey);
     }
 
@@ -58,11 +62,11 @@ export class WeatherService {
 
   private async _fetchWeatherWithFallback(lat: number, lon: number, cacheKey: string, memCached?: CacheEntry) {
     const now = Date.now();
-    console.log(`[WeatherService] Cache MISS for ${cacheKey}. Fetching from Open-Meteo...`);
+    console.log(`[WeatherService] Cache MISS for ${cacheKey}. Fetching from OpenWeather...`);
 
     // Check Cooldown Backoff
-    if (now < this.openMeteoRateLimitUntil) {
-      console.warn(`[WeatherService] Open-Meteo 429 - entering cooldown (or currently in cooldown). Skipping fetch.`);
+    if (now < this.openWeatherRateLimitUntil) {
+      console.warn(`[WeatherService] OpenWeather 429 - entering cooldown (or currently in cooldown). Skipping fetch.`);
       if (memCached) {
         console.log(`[WeatherService] Returning STALE memory cache fallback for ${cacheKey}`);
         return { ...memCached.data, isStale: true };
@@ -71,24 +75,26 @@ export class WeatherService {
     }
 
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_direction_10m`;
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`;
 
       const res = await fetch(url, { 
         signal: AbortSignal.timeout(5000),
         headers: {
           "Accept": "application/json",
-          "User-Agent": "AlertGrid/1.0 (https://alert-grid-six.vercel.app)"
+          "User-Agent": "AlertGrid/1.0"
         }
       });
       
       if (!res.ok) {
+        // Redact the URL to avoid logging the API key
+        const safeUrl = url.replace(process.env.OPENWEATHER_API_KEY!, "HIDDEN_KEY");
         const errBody = await res.text().catch(() => "could not read body");
-        console.error(`[WeatherService] Open-Meteo Error! HTTP ${res.status} | URL: ${url} | Lat: ${lat}, Lon: ${lon} | Body: ${errBody}`);
+        console.error(`[WeatherService] OpenWeather Error! HTTP ${res.status} | URL: ${safeUrl} | Lat: ${lat}, Lon: ${lon} | Body: ${errBody}`);
         
         // Handle 429 Rate Limit Explicitly
         if (res.status === 429) {
-          console.warn(`[WeatherService] Open-Meteo 429 Quota Exhausted! Setting 60m cooldown.`);
-          this.openMeteoRateLimitUntil = now + 60 * 60 * 1000; // 1 hour cooldown
+          console.warn(`[WeatherService] OpenWeather 429 Quota Exhausted! Setting 60m cooldown.`);
+          this.openWeatherRateLimitUntil = now + 60 * 60 * 1000; // 1 hour cooldown
           // Return stale cache if available
           if (memCached) {
              console.log(`[WeatherService] Returning STALE memory cache fallback for ${cacheKey}`);
@@ -97,39 +103,21 @@ export class WeatherService {
           throw new Error("RATE_LIMIT_EXCEEDED");
         }
         
-        throw new Error(`Open-Meteo returned error: ${res.status}`);
+        throw new Error(`OpenWeather returned error: ${res.status}`);
       }
 
       const data = await res.json();
-      const current = data.current;
 
       const weatherData = {
-        temperature: current.temperature_2m,
-        feelsLike: current.apparent_temperature,
-        humidity: current.relative_humidity_2m,
-        windSpeed: current.wind_speed_10m,
-        windDirection: current.wind_direction_10m,
-        precipitation: current.precipitation,
-        condition: "Clear", 
-        description: `WMO Code: ${current.weather_code}`,
+        temperature: data.main?.temp || 0,
+        feelsLike: data.main?.feels_like || 0,
+        humidity: data.main?.humidity || 0,
+        windSpeed: data.wind?.speed || 0,
+        windDirection: data.wind?.deg || 0,
+        precipitation: data.rain && data.rain["1h"] ? data.rain["1h"] : 0,
+        condition: data.weather && data.weather[0] ? data.weather[0].main : "Clear", 
+        description: data.weather && data.weather[0] ? data.weather[0].description : "clear sky",
       };
-
-      const wmoMap: Record<number, string> = {
-        0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-        45: "Fog", 48: "Depositing rime fog", 51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
-        61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain", 71: "Slight snow fall", 73: "Moderate snow fall",
-        75: "Heavy snow fall", 80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
-        95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail",
-      };
-
-      if (wmoMap[current.weather_code]) {
-        weatherData.description = wmoMap[current.weather_code];
-        if (current.weather_code < 40) weatherData.condition = "Clear/Cloudy";
-        else if (current.weather_code < 70) weatherData.condition = "Rain";
-        else if (current.weather_code < 80) weatherData.condition = "Snow";
-        else if (current.weather_code < 90) weatherData.condition = "Showers";
-        else weatherData.condition = "Thunderstorm";
-      }
 
       // Save to memory cache (15 mins TTL)
       this.memoryCache.set(cacheKey, { data: weatherData, expiresAt: now + 900 * 1000 });
